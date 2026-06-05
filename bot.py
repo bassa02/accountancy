@@ -231,16 +231,18 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         save_to_sheets(name, amount, date, user.id, user.username or "—", submitted_at)
         sheets_status = "✅ Збережено в таблиці"
+        logger.info(f"Sheets OK: {name}, {amount}, {date}")
     except Exception as e:
-        logger.error(f"Sheets error: {e}")
-        sheets_status = "⚠️ Помилка запису в таблицю"
+        logger.error(f"Sheets FAILED: {type(e).__name__}: {e}")
+        sheets_status = f"⚠️ Помилка запису в таблицю: {type(e).__name__}"
 
     # Повідомлення для користувача
     await update.message.reply_text(
         f"🎉 *Заявку подано!*\n\n"
         f"👤 {name}\n"
         f"💰 {amount:,.0f} грн\n"
-        f"📅 {date}\n\n"
+        f"📅 {date}\n"
+        f"🕐 Дата звернення: {submitted_at}\n\n"
         f"{sheets_status}\n\n"
         f"Очікуйте підтвердження від відповідального.",
         parse_mode="Markdown",
@@ -249,18 +251,22 @@ async def confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     # Повідомлення відповідальній людині
     username_display = f"@{user.username}" if user.username else f"ID: {user.id}"
-    await context.bot.send_message(
-        chat_id=RECEIVER_CHAT_ID,
-        text=(
-            f"💸 *Нова заявка на аванс*\n\n"
-            f"👤 *{name}*\n"
-            f"💰 *{amount:,.0f} грн*\n"
-            f"📅 *{date}*\n\n"
-            f"🕐 Подано: {submitted_at}\n"
-            f"📱 Telegram: {username_display}"
-        ),
-        parse_mode="Markdown",
-    )
+    try:
+        await context.bot.send_message(
+            chat_id=RECEIVER_CHAT_ID,
+            text=(
+                f"💸 *Нова заявка на аванс*\n\n"
+                f"👤 *{name}*\n"
+                f"💰 *{amount:,.0f} грн*\n"
+                f"📅 Дата видачі: *{date}*\n"
+                f"🕐 Дата звернення: {submitted_at}\n"
+                f"📱 Telegram: {username_display}"
+            ),
+            parse_mode="Markdown",
+        )
+        logger.info(f"Notification sent to {RECEIVER_CHAT_ID}")
+    except Exception as e:
+        logger.error(f"Notification FAILED to {RECEIVER_CHAT_ID}: {type(e).__name__}: {e}")
 
     return ConversationHandler.END
 
